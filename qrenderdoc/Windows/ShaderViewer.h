@@ -40,6 +40,7 @@ class FindReplace;
 class QTableWidgetItem;
 class QKeyEvent;
 class QMouseEvent;
+class QPushButton;
 class QComboBox;
 
 // from Scintilla
@@ -126,6 +127,7 @@ private slots:
   void variables_contextMenu(const QPoint &pos);
   void disassembly_buttonReleased(QMouseEvent *event);
   void disassemble_typeChanged(int index);
+  void dumpdatabutton_pressed();
   void watch_keyPress(QKeyEvent *event);
   void performFind();
   void performFindAll();
@@ -202,6 +204,7 @@ private:
   QFrame *m_DisassemblyToolbar = NULL;
   QWidget *m_DisassemblyFrame = NULL;
   QComboBox *m_DisassemblyType = NULL;
+  QPushButton *m_DumpDataButton = NULL;
   ScintillaEdit *m_Errors = NULL;
   ScintillaEdit *m_FindResults = NULL;
   QList<ScintillaEdit *> m_Scintillas;
