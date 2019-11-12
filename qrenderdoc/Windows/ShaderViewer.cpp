@@ -31,8 +31,8 @@
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPushButton>
-#include <QShortcut>
 #include <QSet>
+#include <QShortcut>
 #include <QToolTip>
 #include "3rdparty/scintilla/include/SciLexer.h"
 #include "3rdparty/scintilla/include/qt/ScintillaEdit.h"
@@ -130,8 +130,8 @@ ShaderViewer::ShaderViewer(ICaptureContext &ctx, QWidget *parent)
 
     m_DumpDataButton = new QPushButton(tr("Dump data"), this);
     toolbarlayout->addWidget(m_DumpDataButton);
-    QObject::connect(m_DumpDataButton, &QPushButton::pressed,
-        this, &ShaderViewer::dumpdatabutton_pressed);
+    QObject::connect(m_DumpDataButton, &QPushButton::pressed, this,
+                     &ShaderViewer::dumpdatabutton_pressed);
 
     QVBoxLayout *framelayout = new QVBoxLayout(m_DisassemblyFrame);
     framelayout->setSpacing(0);
@@ -1242,89 +1242,90 @@ void ShaderViewer::disassemble_typeChanged(int index)
 
 void ShaderViewer::dumpdatabutton_pressed()
 {
-    QString saveFilename = 
-        //QFileDialog::getSaveFileName(this, tr("Pick shader dump file"));
-        RDDialog::getSaveFileName(this, tr("Pick shader dump base filename"));
-    if (saveFilename.isNull())
-        return;
+  QString saveFilename =
+      // QFileDialog::getSaveFileName(this, tr("Pick shader dump file"));
+      RDDialog::getSaveFileName(this, tr("Pick shader dump base filename"));
+  if(saveFilename.isNull())
+    return;
 
-    static uint32_t API_D3D = 1;
-    static uint32_t API_VK = 2;
-    static uint32_t ALL_API = API_D3D | API_VK;
-    
-    const uint32_t currentApi = (m_Ctx.APIProps().pipelineType == GraphicsAPI::Vulkan) ? API_VK : API_D3D;
+  static uint32_t API_D3D = 1;
+  static uint32_t API_VK = 2;
+  static uint32_t ALL_API = API_D3D | API_VK;
 
-    struct FileExtMapping
+  const uint32_t currentApi =
+      (m_Ctx.APIProps().pipelineType == GraphicsAPI::Vulkan) ? API_VK : API_D3D;
+
+  struct FileExtMapping
+  {
+    QString targetStr;
+    QString postfix;
+    uint32_t api;
+  };
+
+  FileExtMapping mappings[] = {
+      {tr("SPIR-V (RenderDoc)"), tr("-spirv_rdoc.txt"), API_VK},
+      {tr("GLSL(SPIRV - Cross)"), tr("-spirv_cross.txt"), API_VK},
+      {tr("SPIR - V Asm(spirv - dis)"), tr("-spirv_dis.txt"), API_VK},
+      {tr("AMD_shader_info disassembly"), tr("-amd_shader_info.txt"), API_VK},
+      {tr("KHR_pipeline_executable_properties"), tr("-KHR_pipeline_exe_properties.txt"), API_VK},
+      {tr("AMDIL"), tr("-AMDIL.txt"), ALL_API},
+      {tr("GCN(Vega 20)"), tr("-vega_20.txt"), ALL_API},
+      {tr("RDNA(Navi 10)"), tr("-navi_10.txt"), ALL_API},
+      {tr("GCN (Vega 20)"), tr("-vega_20.txt"), ALL_API},
+      {tr("RDNA (Navi 10)"), tr("-navi_10.txt"), ALL_API},
+      {tr("DXBC"), tr("-dxbc.txt"), API_D3D},
+  };
+  const unsigned int numMappings = sizeof(mappings) / sizeof(mappings[0]);
+
+  auto saveFileFn = [](QString filename, QString extension, rdcstr text) {
+    QString fullname = filename + extension;
+    QFile file(fullname);
+    if(file.open(QIODevice::ReadWrite))
     {
-        QString targetStr;
-        QString postfix;
-        uint32_t api;
-    };
-
-    FileExtMapping mappings[] = 
-    {
-        { tr("SPIR-V (RenderDoc)"), tr("-spirv_rdoc.txt"), API_VK },
-        { tr("GLSL(SPIRV - Cross)"), tr("-spirv_cross.txt"), API_VK },
-        { tr("SPIR - V Asm(spirv - dis)"), tr("-spirv_dis.txt"), API_VK },
-        { tr("AMD_shader_info disassembly"), tr("-amd_shader_info.txt"), API_VK },
-        { tr("KHR_pipeline_executable_properties"), tr("-KHR_pipeline_exe_properties.txt"), API_VK },
-        { tr("AMDIL"), tr("-AMDIL.txt"), ALL_API },
-        { tr("GCN(Vega 20)"), tr("-vega_20.txt"), ALL_API },
-        { tr("RDNA(Navi 10)"), tr("-navi_10.txt"), ALL_API },
-        { tr("GCN (Vega 20)"), tr("-vega_20.txt"), ALL_API },
-        { tr("RDNA (Navi 10)"), tr("-navi_10.txt"), ALL_API },
-        { tr("DXBC"), tr("-dxbc.txt"), API_D3D },
-    };
-    const unsigned int numMappings = sizeof(mappings) / sizeof(mappings[0]);
-        
-
-    auto saveFileFn = [](QString filename, QString extension, rdcstr text) {
-        QString fullname = filename + extension;
-        QFile file(fullname);
-        if (file.open(QIODevice::ReadWrite)) {            
-            QTextStream stream(&file);
-            stream << text.c_str() << endl;
-        }
-    };
-
-    for (unsigned int i = 0; i < numMappings; ++i)
-    {       
-        if (currentApi & mappings[i].api)
-        {
-            QString targetStr = mappings[i].targetStr;
-            QString targetExt = mappings[i].postfix;
-            QByteArray target = targetStr.toUtf8();
-
-            bool handled = false;
-
-            for (const ShaderProcessingTool &disasm : m_Ctx.Config().ShaderProcessors)
-            {
-                const QString name = targetName(disasm);
-
-                if (targetStr == targetName(disasm))
-                {
-                    ShaderToolOutput out = disasm.DisassembleShader(this, m_ShaderDetails, "");
-
-                    if (!out.result.isEmpty())
-                    {
-                        rdcstr text;
-                        text.assign((const char *)out.result.data(), out.result.size());
-                        saveFileFn(saveFilename, targetExt, text);
-                    }
-                    handled = true;
-                    break;
-                }
-            }
-
-            if (!handled)
-            {
-                m_Ctx.Replay().AsyncInvoke([this, saveFilename, targetExt, target, saveFileFn](IReplayController *r) {
-                    rdcstr disasm = r->DisassembleShader(m_Pipeline, m_ShaderDetails, target.data());
-                    saveFileFn(saveFilename, targetExt, disasm);
-                });
-            }
-        }
+      QTextStream stream(&file);
+      stream << text.c_str() << endl;
     }
+  };
+
+  for(unsigned int i = 0; i < numMappings; ++i)
+  {
+    if(currentApi & mappings[i].api)
+    {
+      QString targetStr = mappings[i].targetStr;
+      QString targetExt = mappings[i].postfix;
+      QByteArray target = targetStr.toUtf8();
+
+      bool handled = false;
+
+      for(const ShaderProcessingTool &disasm : m_Ctx.Config().ShaderProcessors)
+      {
+        const QString name = targetName(disasm);
+
+        if(targetStr == targetName(disasm))
+        {
+          ShaderToolOutput out = disasm.DisassembleShader(this, m_ShaderDetails, "");
+
+          if(!out.result.isEmpty())
+          {
+            rdcstr text;
+            text.assign((const char *)out.result.data(), out.result.size());
+            saveFileFn(saveFilename, targetExt, text);
+          }
+          handled = true;
+          break;
+        }
+      }
+
+      if(!handled)
+      {
+        m_Ctx.Replay().AsyncInvoke(
+            [this, saveFilename, targetExt, target, saveFileFn](IReplayController *r) {
+              rdcstr disasm = r->DisassembleShader(m_Pipeline, m_ShaderDetails, target.data());
+              saveFileFn(saveFilename, targetExt, disasm);
+            });
+      }
+    }
+  }
 }
 
 void ShaderViewer::watch_keyPress(QKeyEvent *event)
